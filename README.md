@@ -1,2 +1,2 @@
 # eosio.cdt-patched
-EOSIO-CDT patched version. Patch allows using CDT on instances with less than 2 CPUs.
+17.01.2020 - current eosio.cdt build version - 1.6.3

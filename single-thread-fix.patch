@@ -1,0 +1,68 @@
+From 51f3af0d6d3d4f594bf2cdaa5e521096728d35b6 Mon Sep 17 00:00:00 2001
+From: Cryptcoin Junkey <cryptcoin.junkey@gmail.com>
+Date: Tue, 6 Aug 2019 03:26:45 +0000
+Subject: [PATCH] Cherry-pick.
+
+Source: https://github.com/llvm/llvm-project/commit/5081e41bdae2eb14a3f3eb8810263f9fea8fc7c1
+
+Fix a crash bug caused by a nested call of parallelForEach.
+
+parallelForEach is not reentrant. We use parallelForEach to call
+each section's writeTo(), so calling the same function within writeTo()
+is not safe.
+
+Fixes https://bugs.llvm.org/show_bug.cgi?id=41508
+
+Differential Revision: https://reviews.llvm.org/D60757
+
+llvm-svn: 358547
+
+original author: rui314
+---
+ wasm/OutputSections.cpp | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/wasm/OutputSections.cpp b/wasm/OutputSections.cpp
+index 256a9884f..06cb2d321 100644
+--- a/wasm/OutputSections.cpp
++++ b/wasm/OutputSections.cpp
+@@ -109,8 +109,8 @@ void CodeSection::writeTo(uint8_t *Buf) {
+   memcpy(Buf, CodeSectionHeader.data(), CodeSectionHeader.size());
+
+   // Write code section bodies
+-  parallelForEach(Functions,
+-                  [&](const InputChunk *Chunk) { Chunk->writeTo(Buf); });
++  for (const InputChunk *Chunk : Functions)
++    Chunk->writeTo(Buf);
+ }
+
+ uint32_t CodeSection::numRelocations() const {
+@@ -166,7 +166,7 @@ void DataSection::writeTo(uint8_t *Buf) {
+   // Write data section headers
+   memcpy(Buf, DataSectionHeader.data(), DataSectionHeader.size());
+
+-  parallelForEach(Segments, [&](const OutputSegment *Segment) {
++  for (const OutputSegment *Segment : Segments) {
+     // Write data segment header
+     uint8_t *SegStart = Buf + Segment->SectionOffset;
+     memcpy(SegStart, Segment->Header.data(), Segment->Header.size());
+@@ -174,7 +174,7 @@ void DataSection::writeTo(uint8_t *Buf) {
+     // Write segment data payload
+     for (const InputChunk *Chunk : Segment->InputSegments)
+       Chunk->writeTo(Buf);
+-  });
++  }
+ }
+
+ uint32_t DataSection::numRelocations() const {
+@@ -222,8 +222,8 @@ void CustomSection::writeTo(uint8_t *Buf) {
+   Buf += NameData.size();
+
+   // Write custom sections payload
+-  parallelForEach(InputSections,
+-                  [&](const InputSection *Section) { Section->writeTo(Buf); });
++  for (const InputSection *Section: InputSections)
++    Section->writeTo(Buf);
+ }
+
+ uint32_t CustomSection::numRelocations() const {
